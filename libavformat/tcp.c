@@ -73,7 +73,9 @@ static int tcp_open(URLContext *h, const char *uri, int flags)
     int ret;
     char hostname[1024],proto[1024],path[1024];
     char portstr[10];
-    s->open_timeout = 5000000;
+    // s->open_timeout = 5000000;
+    // By Jeffer : reduce wait time
+    s->open_timeout = 15000;
 
     av_url_split(proto, sizeof(proto), NULL, 0, hostname, sizeof(hostname),
         &port, path, sizeof(path), uri);
@@ -103,7 +105,9 @@ static int tcp_open(URLContext *h, const char *uri, int flags)
         s->open_timeout =
         h->rw_timeout   = s->rw_timeout;
     }
-    hints.ai_family = AF_UNSPEC;
+    // hints.ai_family = AF_UNSPEC;
+    // By Jeffer : AF_INET For IPv4 ONLY TO SPEEDUP CONNECT
+    hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     snprintf(portstr, sizeof(portstr), "%d", port);
     if (s->listen)
@@ -126,11 +130,18 @@ static int tcp_open(URLContext *h, const char *uri, int flags)
     // workaround for IOS9 getaddrinfo in IPv6 only network use hardcode IPv4 address can not resolve port number.
     if (cur_ai->ai_family == AF_INET6){
         struct sockaddr_in6 * sockaddr_v6 = (struct sockaddr_in6 *)cur_ai->ai_addr;
-        if (!sockaddr_v6->sin6_port){
-            sockaddr_v6->sin6_port = htons(port);
-        }
+        // By Jeffer : Error DNS cache not flush.
+	//if (!sockaddr_v6->sin6_port){
+        //    sockaddr_v6->sin6_port = htons(port);
+        //}
+        sockaddr_v6->sin6_port = htons(port);
     }
 #endif
+    // By Jeffer : Error DNS cache not flush.
+    if (cur_ai->ai_family == AF_INET){
+        struct sockaddr_in * sockaddr_v4 = (struct sockaddr_in *)cur_ai->ai_addr;
+        sockaddr_v4->sin_port = htons(port);
+    }
 
     fd = ff_socket(cur_ai->ai_family,
                    cur_ai->ai_socktype,
